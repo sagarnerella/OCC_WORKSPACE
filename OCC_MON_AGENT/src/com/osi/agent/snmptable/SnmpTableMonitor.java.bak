@@ -1,0 +1,244 @@
+package com.osi.agent.snmptable;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
+import org.apache.log4j.Logger;
+
+import com.adventnet.snmp.beans.DataException;
+import com.adventnet.snmp.beans.SnmpTable;
+import com.adventnet.snmp.mibs.MibException;
+import com.osi.agent.common.CommonUtilities;
+import com.osi.agent.exception.OCCAgentCheckpointMonitoringException;
+import com.osi.agent.exception.OCCAgentException;
+import com.osi.agent.exception.OCCAgentSNMPException;
+import com.osi.agent.exception.OCCAgentSnmpTableException;
+import com.osi.agent.monitor.IMonitor;
+import com.osi.agent.snmp.SNMPMonitor;
+import com.osi.agent.vo.CheckPointDetails;
+import com.osi.agent.vo.CheckpointResult;
+
+public class SnmpTableMonitor implements IMonitor{
+	private static final Logger LOGGER = Logger.getLogger(SNMPMonitor.class);
+	private CheckPointDetails checkPointDetail = null;
+	@Override
+	public CheckpointResult performCheck(CheckPointDetails checkPointDetails)
+			throws OCCAgentCheckpointMonitoringException {
+		// TODO Auto-generated method stub
+		String result= null;
+		CheckpointResult checkpointResult = null;
+		boolean resultFlag = false;
+		try {
+			if(checkPointDetails.isValid(checkPointDetails)){	
+				checkPointDetail = checkPointDetails;
+				boolean checkPointDetailFlag = CommonUtilities.isNotNull(checkPointDetail);
+				if(checkPointDetailFlag){
+					result=getResult(checkPointDetail.getSnmpTableIpAddress().trim(),checkPointDetail.getCheckPoint().trim(),checkPointDetail.getSnmpTableMibName().trim(),checkPointDetail.getCommunityString().trim(),checkPointDetail.getSnmpTableAlgorithm().trim(),checkPointDetail.getSnmpTableColumnNames().trim(),checkPointDetail.getUnitOfMeasure().trim(),checkPointDetail.getSnmpTableRowId());
+					resultFlag = CommonUtilities.isNotNullAndEmpty(result);
+					if(resultFlag){
+						checkpointResult = new CheckpointResult();
+						LOGGER.info("result snmp table "+result);
+						checkpointResult.setCheckPointresult(result);
+						checkpointResult.setCheckPointDetails(checkPointDetails);
+					}
+				}
+			}
+				}catch (Exception e) {
+					LOGGER.error("",e);
+					throw new OCCAgentSNMPException("", "Error while getting the agent performCheck", e.getMessage());
+				} finally{
+					if(!resultFlag){
+						checkpointResult=new CheckpointResult();
+						checkpointResult.setCheckPointresult("Device Not Connected");
+					}
+				}
+				return checkpointResult;
+	}
+	public String getResult(String address,
+             String tableOid,
+             String mib,String communityStrg,String snmpTableAlgorithm,String snmpTableColumns,String unitOfMesure,int snmpTableRowId) throws OCCAgentSnmpTableException{
+		long startTime=System.currentTimeMillis();
+		 String l_sResult="";
+		 synchronized (SnmpTableMonitor.class) { 
+	    	List<String> columnHeadings=new ArrayList<String>();
+	    	List<SnmpTableRow> data=new ArrayList<SnmpTableRow>();
+	    	String remoteHost = address; 
+			String tableoid =tableOid;
+
+		SnmpTable l_sSnmpTable = new SnmpTable();
+		l_sSnmpTable.setTargetHost(remoteHost);
+		l_sSnmpTable.setCommunity(communityStrg);
+			try{
+				l_sSnmpTable.loadMibs(mib);
+				l_sSnmpTable.setTableOID(tableoid);
+			
+		System.out.println("Getting table.  Table items:");
+
+		StringBuffer l_SbRowData = new StringBuffer(); 
+		try { Thread.sleep(5000); }  // allow some time to get all rows
+		catch (InterruptedException ex) {}  
+		 
+		for (int i=0;i<l_sSnmpTable.getColumnCount();i++){  // print column names
+		l_SbRowData.append(l_sSnmpTable.getColumnName(i)+" \t");
+		columnHeadings.add(l_sSnmpTable.getColumnName(i).toString());
+		}
+		System.out.println("result "+l_SbRowData.toString());
+		SnmpTableRow firstRow=new SnmpTableRow();
+		firstRow.setValue(columnHeadings);
+		data.add(firstRow);
+		//snmpTable.setRow(firstRow);
+		
+		StringBuffer sb2 = new StringBuffer();
+		for (int j=0;j<l_sSnmpTable.getRowCount();j++) {
+			List<String> rowdata=new ArrayList<String>();
+			SnmpTableRow l_objSnmpTableRow = new SnmpTableRow();
+			for (int i=0;i<l_sSnmpTable.getColumnCount();i++){
+			 sb2.append(l_sSnmpTable.getValueAt(j,i)+" \t");
+			 rowdata.add(l_sSnmpTable.getValueAt(j,i)!=null?l_sSnmpTable.getValueAt(j,i).toString().trim():"");
+		    }
+		    l_objSnmpTableRow.setValue(rowdata);
+		    //System.out.println("data "+rowdata.toString());
+			data.add(l_objSnmpTableRow);
+		    sb2.append(" \n");
+		}
+	/*	System.out.println(sb2.toString());
+	*/	//snmpTable.setRowList(data);
+		
+		
+		
+		
+		List<String> selectedColumns=null;
+		if(null!=snmpTableColumns)
+			selectedColumns=new ArrayList<String>(Arrays.asList(snmpTableColumns.split(",")));
+		if(!selectedColumns.contains("hrStorageAllocationUnits"))
+			selectedColumns.add("hrStorageAllocationUnits");
+		
+		
+		
+		
+		ScriptEngine engine = null;
+		ScriptEngineManager mgr = new ScriptEngineManager();
+	    engine = mgr.getEngineByName("JavaScript");
+		
+					//if(l_alCoumns.contains(snmpTable.getRow().get(i).getValue().get(j))){
+						Map<String,String> keyValuePair=new HashMap<String,String>();
+						LOGGER.info("snmpTableRowId "+snmpTableRowId);
+						System.out.println("snmpTableRowId "+snmpTableRowId);
+						System.out.println("checkpoint id  "+checkPointDetail.getCheckpointID());
+						for(int k=0 ; k<data.get(0).getValue().size();k++){
+							if(selectedColumns.contains(columnHeadings.get(k))){
+								keyValuePair.put(columnHeadings.get(k), data.get(snmpTableRowId).getValue().get(k));
+							}
+						}
+						 int loopCount=0;
+						    Map<String,Integer> mapUnitOfMesure=new HashMap<String,Integer>();
+						    mapUnitOfMesure.put("KB",1);
+						    mapUnitOfMesure.put("MB",2);
+						    mapUnitOfMesure.put("GB",3);
+						    mapUnitOfMesure.put("TB",4);
+						    if(mapUnitOfMesure.containsKey(unitOfMesure)){
+						    	loopCount=mapUnitOfMesure.get(unitOfMesure);
+						    	
+						    }
+						  /*  try { Thread.sleep(10000); }  // allow some time to get all rows
+							catch (InterruptedException ex) {}  */
+						String hrStorageAllocationUnits="hrStorageAllocationUnits";
+						String hrStorageSize="";
+						if(unitOfMesure!=null && (!unitOfMesure.equals("PERCENT") && !unitOfMesure.equals("%") ))
+						hrStorageSize=convertUnitOfMeasure("hrStorageAllocationUnits","hrStorageSize",loopCount);
+						else
+							hrStorageSize="hrStorageSize";
+						String hrStorageUsed=""; 
+						if(unitOfMesure!=null && (!unitOfMesure.equals("PERCENT") && !unitOfMesure.equals("%") ))
+						hrStorageUsed=convertUnitOfMeasure("hrStorageAllocationUnits","hrStorageUsed",loopCount);
+						else
+						hrStorageUsed="hrStorageUsed";
+						Iterator<Entry<String, String>> it = keyValuePair.entrySet().iterator();
+					    while (it.hasNext()) {
+							Map.Entry<String, String> pair = (Entry<String, String>)it.next();
+					        LOGGER.info("snmpTableColumns "+pair.getKey().toString()+""+ pair.getValue().toString());
+					        hrStorageSize=hrStorageSize.replaceAll(pair.getKey().toString(), pair.getValue().toString());
+					        hrStorageUsed=hrStorageUsed.replaceAll(pair.getKey().toString(), pair.getValue().toString());
+					        hrStorageAllocationUnits=hrStorageAllocationUnits.replace(pair.getKey().toString(), pair.getValue().toString());
+					        it.remove();
+					    }
+					    
+					    LOGGER.info("hrStorageSize "+hrStorageSize);
+					    System.out.println("hrStorageSize "+hrStorageSize);
+					    Object result1;
+							if(unitOfMesure!=null && (!unitOfMesure.equals("PERCENT") && !unitOfMesure.equals("%") )){
+							result1 = engine.eval(hrStorageSize);
+						
+					    hrStorageSize=result1.toString();
+					    Object result2;
+							result2 = engine.eval(hrStorageUsed);
+							hrStorageUsed=result2.toString();
+							}
+					   System.out.println("hrStorageSize "+hrStorageSize);
+					   System.out.println("hrStorageUsed "+hrStorageUsed);
+					   String rowAlgorithm=snmpTableAlgorithm;
+						
+					   Map<String,String> l_map=new HashMap<String,String>();
+						l_map.put("hrStorageSize",hrStorageSize);
+						l_map.put("hrStorageUsed",hrStorageUsed);
+						l_map.put("hrStorageAllocationUnits",hrStorageAllocationUnits);
+						Iterator<String> l_itr=l_map.keySet().iterator();
+						while(l_itr.hasNext()){
+							String key=l_itr.next();
+							rowAlgorithm=rowAlgorithm.replaceAll(key,l_map.get(key));
+						}
+						System.out.println("rowAlgorithm "+rowAlgorithm);
+						l_sResult=engine.eval(rowAlgorithm).toString();
+						System.out.println("Thread Name"+Thread.currentThread().getName());
+						}
+						catch (IndexOutOfBoundsException e) {
+							// TODO Auto-generated catch block
+							throw new OCCAgentSnmpTableException("", "Error while getting the SNMPTABLE performCheck", e.getMessage());
+						}
+						catch (ScriptException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						 catch (Exception e) {
+							LOGGER.error("",e);
+							throw new OCCAgentSnmpTableException("", "Error while getting the SNMPTABLE performCheck", e.getMessage());
+						} finally{
+							/*if(!resultFlag){
+								checkpointResult=new CheckpointResult();
+								checkpointResult.setCheckPointresult("Device Not Connected");
+							}*/
+						}
+		 long endTime=System.currentTimeMillis();
+		 System.out.print("total time:"+(endTime-startTime));
+		 }
+	 return l_sResult;
+	 
+	 }
+	 
+	 public static String convertUnitOfMeasure(String hrStorageAllocationUnits,String hrStorageSizeOrUsed,int loopCount){
+	    	ScriptEngine engine = null;
+	    	ScriptEngineManager mgr = new ScriptEngineManager();
+	        engine = mgr.getEngineByName("JavaScript");
+	        String createUnitofmsr="";
+	        String openBr="(";
+	        String closeBr=")";
+	        for(int i=1;i<=loopCount;i++){
+	        	if(i==1)
+	        	createUnitofmsr=openBr+hrStorageAllocationUnits+"*"+hrStorageSizeOrUsed+"/1024"+closeBr;
+	        	else
+	        		createUnitofmsr=openBr+createUnitofmsr+"/1024"+closeBr;
+	        }
+	    	return createUnitofmsr;
+	    }
+}

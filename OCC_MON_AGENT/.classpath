@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.7.0_75"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="lib/snmp4j-2.3.1.jar"/>
+	<classpathentry kind="lib" path="lib/commons-io-2.0.1.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
+	<classpathentry kind="lib" path="lib/quartz-2.2.1.jar" sourcepath="C:/Users/skummitha/.m2/repository/org/quartz-scheduler/quartz/2.2.1/quartz-2.2.1-sources.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-api-1.6.6.jar"/>
+	<classpathentry kind="lib" path="lib/occ-scheduler.jar"/>
+	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.24-bin.jar"/>
+	<classpathentry kind="lib" path="lib/grep4j-1.8.7.jar"/>
+	<classpathentry kind="lib" path="lib/grep4j-with-dependencies.jar"/>
+	<classpathentry kind="lib" path="lib/ojdbc14.jar"/>
+	<classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
+	<classpathentry kind="lib" path="lib/AdventNetLogging.jar"/>
+	<classpathentry kind="lib" path="lib/AdventNetSnmp.jar"/>
+	<classpathentry kind="lib" path="lib/jaxp.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-log4j12-1.7.19.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-databind-2.5.0.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.2.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

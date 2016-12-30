@@ -1,0 +1,81 @@
+package com.osi.manager.jobs;
+
+import java.util.List;
+
+import org.apache.log4j.Logger;
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+
+import com.osi.manager.common.CommonUtilities;
+import com.osi.manager.dao.IManagerDao;
+import com.osi.manager.dao.ManagerDao;
+import com.osi.manager.exception.CreateException;
+import com.osi.manager.exception.DBConnectException;
+import com.osi.manager.exception.FinderException;
+import com.osi.manager.exception.UpdateException;
+import com.osi.manager.snmp.adapter.SNMPManagerSender;
+import com.osi.manager.vo.Device;
+import com.osi.manager.vo.MSAgent;
+
+public class ConfigPublisherJob implements Job {
+	private static final Logger LOGGER = Logger.getLogger(ConfigPublisherJob.class);
+	//private static boolean flag=true;
+	@Override
+	public void execute(JobExecutionContext context) throws JobExecutionException {
+		MSAgent msAgent = null;
+		IManagerDao iManagerDao = null;
+		SNMPManagerSender managerSender = null;
+		List<Device> deviceList=null;
+		msAgent = (MSAgent) context.getJobDetail().getJobDataMap().get(CommonUtilities.getProperty("GET_AGENTS"));
+		LOGGER.info("ConfigPublisherJob fired...."+msAgent.getAgentId()+" And execution flag = "+msAgent.isExecutionFlag());
+		try {
+			if(!msAgent.isExecutionFlag()){
+				msAgent.setExecutionFlag(true);
+				context.getJobDetail().getJobDataMap().put(CommonUtilities.getProperty("GET_AGENTS"), msAgent);
+				managerSender=(SNMPManagerSender)context.getJobDetail().getJobDataMap().get(CommonUtilities.getProperty("SNMP_MANAGER_SENDER"));
+				if(null != msAgent && !msAgent.equals("")){
+					iManagerDao = (IManagerDao) new ManagerDao();
+					deviceList = iManagerDao.getEntriesToPublish(msAgent,"DEVICE_CONFIG");
+					if(deviceList != null && deviceList.size() > 0){
+						String devicePublishXML = null;
+						for (int index=0;index<deviceList.size();index++) {
+							devicePublishXML = CommonUtilities.getXMLFromObject(deviceList.get(index), Device.class);
+							LOGGER.info("devicePublishXML==>"+devicePublishXML);
+							if(null !=devicePublishXML && !devicePublishXML.equals("")){
+								try {
+									boolean sendFlag=managerSender.send(CommonUtilities.getProperty("DEVICE_CONFIG_OID"),devicePublishXML);
+									if(sendFlag){
+										iManagerDao.updatePublisherStatus(deviceList.get(index).getPublisherId(),"P","","");
+									}else{
+										iManagerDao.updatePublisherStatus(deviceList.get(index).getPublisherId(),"Z",devicePublishXML,"");
+									}
+								} catch (Exception e) {
+									LOGGER.error("Error occurred while sending threshold configuration",e);
+									iManagerDao.updatePublisherStatus(deviceList.get(index).getPublisherId(),"Z",devicePublishXML,e.getMessage());
+								}
+							}
+						}
+					}
+				}
+				msAgent.setExecutionFlag(false);
+				context.getJobDetail().getJobDataMap().put(CommonUtilities.getProperty("GET_AGENTS"), msAgent);
+			}
+		} catch(CreateException ce){
+			LOGGER.error("Error occurred while executing ConfigPublisherJob",ce);
+		} catch(UpdateException ue){
+			LOGGER.error("Error occurred while executing ConfigPublisherJob",ue);
+		} catch(FinderException fe){
+			LOGGER.error("Error occurred while executing ConfigPublisherJob",fe);
+		} catch (DBConnectException e) {
+			LOGGER.error("Error occurred while performing DB operations in ConfigPublisherJob",e);
+		} catch (Exception e) {
+			LOGGER.error("Error occurred while executing ConfigPublisherJob",e);
+		} finally {
+			if (null != msAgent) {
+				msAgent.setExecutionFlag(false);
+				context.getJobDetail().getJobDataMap().put(CommonUtilities.getProperty("GET_AGENTS"), msAgent);
+			}
+		}
+	}
+}

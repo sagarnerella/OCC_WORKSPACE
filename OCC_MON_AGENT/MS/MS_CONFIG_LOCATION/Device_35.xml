@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="UTF-8"?><device deviceID="35" deviceStatus="1">    <jmx connectType="JMX" hostName="" ipAddress="192.168.174.152" port="7011">        <checkpoint checkType="R" checkpoint="java.lang:type=Threading@TotalStartedThreadCount" checkpointID="119" frequency="0 0/5 00-23 1/1 * ?" fromDate="2016-11-01" repeatCount="0" toDate="2018-11-30"/>    </jmx></device>
